@@ -1,4 +1,4 @@
-const FREEPIK_BASE_URL = "https://api.freepik.com";
+const MAGNIFIC_BASE_URL = "https://api.magnific.com";
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -12,6 +12,8 @@ function getTaskId(data) {
     data?.task_id ||
     data?.result?.task_id ||
     data?.id ||
+    data?.data?.id ||
+    data?.raw?.data?.task_id ||
     null
   );
 }
@@ -30,9 +32,17 @@ function getVideoUrl(data) {
   );
 }
 
-function getEndpoint(modelId) {
+function getGenerateEndpoint(modelId) {
   if (modelId === "kling-2-6-motion-control") {
     return "/v1/ai/video/kling-v2-6-motion-control-pro";
+  }
+
+  if (modelId === "kling-3-0-motion-control") {
+    return "/v1/ai/video/kling-v3-motion-control-pro";
+  }
+
+  if (modelId === "kling-3-1-motion-control") {
+    return "/v1/ai/video/kling-v3-motion-control-pro";
   }
 
   return "/v1/ai/video/kling-v3-motion-control-pro";
@@ -81,32 +91,43 @@ Make the dance motion realistic, natural, smooth, and stable, following the timi
 Negative prompt: changed face, changed identity, changed body shape, slimmer body, bigger body, face morphing, distorted hands, weird legs, stiff motion, flicker, blur, warping, AI look.`;
 
     const payload = {
-      video_url: videoUrl,
       image_url: imageUrl,
+      video_url: videoUrl,
       prompt: finalPrompt,
-      duration: String(duration || 5),
-      aspect_ratio: aspectRatio || "9:16",
-      cfg_scale: 0.35,
+      character_orientation: "video",
+      cfg_scale: 0.5,
       negative_prompt:
         "changed face, changed identity, changed body shape, slimmer body, bigger body, face morphing, distorted hands, weird legs, stiff motion, flicker, blur, warping, AI look"
     };
 
-    const endpoint = getEndpoint(modelId);
+    const endpoint = getGenerateEndpoint(modelId);
 
-    const response = await fetch(`${FREEPIK_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${MAGNIFIC_BASE_URL}${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-freepik-api-key": apiKey
+        "x-magnific-api-key": apiKey
       },
       body: JSON.stringify(payload)
     });
 
-    const data = await response.json().catch(() => ({}));
+    const text = await response.text();
+    let data = {};
+
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { rawText: text };
+    }
 
     if (!response.ok) {
       return res.status(response.status).json({
-        error: data?.message || data?.error || data?.detail || "Generate gagal.",
+        error:
+          data?.message ||
+          data?.error ||
+          data?.detail ||
+          data?.rawText ||
+          "Generate gagal.",
         raw: data
       });
     }
@@ -122,4 +143,4 @@ Negative prompt: changed face, changed identity, changed body shape, slimmer bod
       error: error?.message || "Terjadi error backend."
     });
   }
-    }
+}
