@@ -1,4 +1,4 @@
-const FREEPIK_BASE_URL = "https://api.freepik.com";
+const MAGNIFIC_BASE_URL = "https://api.magnific.com";
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -16,7 +16,21 @@ function getVideoUrl(data) {
     data?.url ||
     data?.generated?.[0]?.url ||
     data?.generated?.[0] ||
+    data?.raw?.data?.video_url ||
+    data?.raw?.data?.url ||
+    data?.raw?.data?.generated?.[0]?.url ||
+    data?.raw?.data?.generated?.[0] ||
     null
+  );
+}
+
+function getStatus(data) {
+  return (
+    data?.data?.status ||
+    data?.status ||
+    data?.raw?.data?.status ||
+    data?.raw?.status ||
+    "UNKNOWN"
   );
 }
 
@@ -26,12 +40,20 @@ function isFailed(status) {
   );
 }
 
-function getEndpoint(modelId) {
+function getStatusEndpoint(modelId, taskId) {
   if (modelId === "kling-2-6-motion-control") {
-    return "/v1/ai/video/kling-v2-6-motion-control-pro";
+    return `/v1/ai/image-to-video/kling-v2-6/${taskId}`;
   }
 
-  return "/v1/ai/video/kling-v3-motion-control-pro";
+  if (modelId === "kling-3-0-motion-control") {
+    return `/v1/ai/video/kling-v3-motion-control-pro/${taskId}`;
+  }
+
+  if (modelId === "kling-3-1-motion-control") {
+    return `/v1/ai/video/kling-v3-motion-control-pro/${taskId}`;
+  }
+
+  return `/v1/ai/video/kling-v3-motion-control-pro/${taskId}`;
 }
 
 export default async function handler(req, res) {
@@ -56,25 +78,37 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Task ID kosong." });
     }
 
-    const endpoint = getEndpoint(modelId);
+    const endpoint = getStatusEndpoint(modelId, taskId);
 
-    const response = await fetch(`${FREEPIK_BASE_URL}${endpoint}/${taskId}`, {
+    const response = await fetch(`${MAGNIFIC_BASE_URL}${endpoint}`, {
       method: "GET",
       headers: {
-        "x-freepik-api-key": apiKey
+        "x-magnific-api-key": apiKey
       }
     });
 
-    const data = await response.json().catch(() => ({}));
+    const text = await response.text();
+    let data = {};
+
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { rawText: text };
+    }
 
     if (!response.ok) {
       return res.status(response.status).json({
-        error: data?.message || data?.error || data?.detail || "Gagal cek status.",
+        error:
+          data?.message ||
+          data?.error ||
+          data?.detail ||
+          data?.rawText ||
+          "Gagal cek status.",
         raw: data
       });
     }
 
-    const status = data?.data?.status || data?.status || "UNKNOWN";
+    const status = getStatus(data);
     const videoUrl = getVideoUrl(data);
 
     return res.status(200).json({
@@ -89,4 +123,4 @@ export default async function handler(req, res) {
       error: error?.message || "Terjadi error status."
     });
   }
-      }
+}
